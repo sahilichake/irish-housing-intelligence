@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "0 6 2 * *"   # monthly: re-run the full pipeline on fresh PPR data
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Pipeline on synthetic data
+        run: python -m src.pipeline --sample
+      - name: Tests
+        run: pytest -q
+
+  monthly-retrain:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Retrain on latest Property Price Register
+        run: python -m src.pipeline --refresh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: model-metrics
+          path: |
+            models/price_metrics.json
+            models/forecast_metrics.json
